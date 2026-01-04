@@ -5,6 +5,8 @@ import {uploadOnCloudinary,deleteFromCloudinary} from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import { redisClient } from "../db/redis.js"
+import { uploadQueue } from "../queues/videoQueue.js"
 
 
 
@@ -88,13 +90,32 @@ const registerUser = asyncHandler(async (req, res) => {
 
     try {
         const user = await User.create({
-            fullname,
-            avatar: avatar.url,
-            coverImage: coverImage?.url || "",
-            email,
-            password,
-            username: username.toLowerCase()
+          fullname,
+          email,
+          password,
+          username: username.toLowerCase(),
+          avatar: "processing...",
+          coverImage: coverLocalPath ? "processing..." : ""
         });
+
+        await uploadQueue.add('process-registration-assets', {
+            userId: user._id,
+            avatarLocalPath: avatarLocalPath,
+            coverLocalPath: coverLocalPath
+        },{
+            attempts: 3,
+            backoff: {
+                type: "exponential",
+                delay: 5000
+            },
+            removeOnComplete : true, //cleanredisonsuccess
+            removeOnFail: false
+
+        });
+
+        return res.status(201).json(
+            new ApiResponse(201,user,"Registration successful! Images are being processed")
+        )
 
         const createdUser = await User.findById(user._id).select("-password -refreshToken");
 
@@ -364,6 +385,14 @@ const updateUserCoverImage = asyncHandler(async(req,res) => {
 
 const getUserChannelProfile = asyncHandler(async(req,res) => {
     const {username} = req.params;
+    const cacheKey = `profile:${username.toLowerCase()}`;
+
+    const cachedProfile = await redisClient.get(cacheKey);//checkingredisfirst
+    if(cachedProfile){
+        return res.status(200).json(
+            new ApiResponse(200,JSON.parse(cachedProfile), "Channel found from cache")
+        )
+    }
 
     if(!username?.trim()){
         throw new ApiError(400,"Username is required")
@@ -428,6 +457,7 @@ const getUserChannelProfile = asyncHandler(async(req,res) => {
         throw new ApiError(404,"Channel not found")
     } 
 
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(channel[0]));
 
      return res
     .status(200)
@@ -437,55 +467,70 @@ const getUserChannelProfile = asyncHandler(async(req,res) => {
 
 
 const getWatchHistory = asyncHandler(async(req,res) => {
-    const user = await User.aggregate([
-        {
-            $match : {
-                _id : new mongoose.Types.ObjectId(req.user?._id)
-            }
-        },
-        {
-            $lookup : {
-                from : "videos",
-                localField : "watchHistory",
-                foreignField : "_id",
-                as : "watchHistory",
-                pipeline : [    
-                    {
-                        $lookup : {
-                            from : "users",
-                            localField : "owner",
-                            foreignField : "_id",
-                            as : "owner",
-                            pipeline : [
-                                {
-                                     $project : {
-                                            fullname : 1,
-                                            username : 1,
-                                            avatar : 1
-                                     }
+    const userId = req.user?._id.toString();
+    const cacheKey = `user:history:${userId}`
+    try {
+
+        const cachedHistory = await redisClient.get(cacheKey);
+        if(cachedHistory){
+            return res.status(200).json(new ApiResponse(200,JSON.parse(cachedHistory),"Watch history from (cache)"))
+        }
+        const user = await User.aggregate([
+            {
+                $match : {
+                    _id : new mongoose.Types.ObjectId(req.user?._id)
+                }
+            },
+            {
+                $lookup : {
+                    from : "videos",
+                    localField : "watchHistory",
+                    foreignField : "_id",
+                    as : "watchHistory",
+                    pipeline : [    
+                        {
+                            $lookup : {
+                                from : "users",
+                                localField : "owner",
+                                foreignField : "_id",
+                                as : "owner",
+                                pipeline : [
+                                    {
+                                         $project : {
+                                                fullname : 1,
+                                                username : 1,
+                                                avatar : 1
+                                         }
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            $addFields : {
+                                owner : {
+                                    $first : "$owner"   
                                 }
-                            ]
-                        }
-                    },
-                    {
-                        $addFields : {
-                            owner : {
-                                $first : "$owner"   
                             }
                         }
-                    }
-                ]
+                    ]
+                }
             }
+        ])
+    
+        if(!user.length){
+            throw new ApiError(404,"User not found")
         }
-    ])
 
-    if(!user.length){
-        throw new ApiError(404,"User not found")
+        const watchHistory = user[0]?.watchHistory;
+
+        await redisClient.setEx(cacheKey, 120, JSON.stringify(watchHistory));
+    
+        return res
+        .status(200)
+        .json(new ApiResponse(200,user[0]?.watchHistory,"Watch history found successfully"))
+    } catch (error) {
+        console.error("Redis Error:", error);        
     }
-
-    return res
-    .status(200)
-    .json(new ApiResponse(200,user[0]?.watchHistory,"Watch history found successfully"))
 })
 
 
