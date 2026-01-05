@@ -3,7 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 
 import {createBullBoard} from "@bull-board/api";
-import {BullMQAdapter} from "@bull-board/api/bullMQAdapter.js"
+import {BullMQAdapter} from "@bull-board/api/bullMQAdapter"
 import { ExpressAdapter } from "@bull-board/express";
 import { uploadQueue } from "./queues/videoQueue.js";
 
