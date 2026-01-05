@@ -1,102 +1,123 @@
-# TubeScale
-**Event-Driven Video Streaming Backend**
+# 🎬 TubeScale  
+**Scalable Event-Driven Backend & Cloud Infrastructure**
 
-TubeScale is a high-performance, production-ready backend infrastructure designed for **scalability, resilience, and low latency**.  
-It leverages an **event-driven architecture** to decouple heavy media processing from the primary API thread, consistently delivering **sub-100ms response times** for critical user actions.
+TubeScale is a **production-grade, event-driven backend system** designed for **high scalability, resilience, and low latency**.  
+It decouples heavy media processing from the request lifecycle using **background workers**, enabling **sub-100ms API responses** for critical user actions even under high load.
+
+The system is **fully containerized, cloud-deployed on AWS**, and fronted by **Nginx** for secure traffic handling.
 
 ---
 
 ## 🚀 Key Highlights
 
-- ⚡ Event-driven, non-blocking backend
-- 📈 Built for high concurrency & scalability
-- 🧠 Intelligent caching with strong consistency
-- 🔁 Fault-tolerant background processing
-- 🐳 Fully containerized & production-ready
+- ⚡ Event-driven, non-blocking backend architecture  
+- 📈 Built for high concurrency and horizontal scalability  
+- 🧠 Intelligent caching with strong consistency guarantees  
+- 🔁 Fault-tolerant background job processing  
+- 🐳 Fully containerized and cloud-deployed (AWS EC2)  
+- 🌐 Reverse-proxied with Nginx and publicly accessible  
 
 ---
 
 ## 🏗 System Architecture & Design Decisions
 
-### 1. Asynchronous Media Pipeline (High Concurrency)
+### 1️⃣ Asynchronous Media Pipeline (High Concurrency)
 
 **Problem**  
-Synchronous uploads to Cloudinary during user registration and profile updates caused network bottlenecks and frequent request timeouts.
+Synchronous uploads to Cloudinary during user actions (registration, profile updates) caused:
+- Network bottlenecks  
+- Request timeouts  
+- Poor API responsiveness  
 
 **Solution**  
 Implemented a **Producer–Consumer pattern** using **BullMQ + Redis**:
-- API handles validation and DB writes only
-- Media uploads are pushed to background workers
+
+- API layer handles validation and database writes only  
+- Media upload jobs are pushed to background workers  
+- Workers process uploads independently and asynchronously  
 
 **Result**
-- 🚀 **95% reduction** in API response time
-- Registration flow now returns instantly
-- Media processing is fully decoupled and retry-safe
+- 🚀 **~95% reduction** in API response time  
+- Instant response for user-facing APIs  
+- Retry-safe and failure-isolated media processing  
 
 ---
 
-### 2. Distributed Caching (Performance Optimization)
+### 2️⃣ Distributed Caching (Performance Optimization)
 
 **Strategy**
-- Implemented **Cache-Aside pattern** using Redis
-- Cached expensive MongoDB Aggregation Pipelines:
-  - User Watch History
-  - Channel Profile Stats
+- Implemented **Cache-Aside pattern** using Redis  
+- Cached expensive MongoDB aggregation queries such as:
+  - User watch history  
+  - Channel profile statistics  
 
 **Efficiency**
-- 🔥 **80% reduction** in MongoDB CPU usage
-- Profile lookups served in **<10ms** from memory
+- 🔥 **~80% reduction** in MongoDB CPU usage  
+- Cached reads served in **<10ms** from memory  
 
 **Consistency**
-- Automatic **Write-Through Cache Invalidation**
-- Relevant Redis keys are purged immediately on DB writes
+- Automatic cache invalidation on database writes  
+- Ensures no stale or inconsistent reads  
 
 ---
 
-### 3. Fault Tolerance & Resilience
+### 3️⃣ Fault Tolerance & Resilience
 
 **Retry Mechanism**
-- Configured **Exponential Backoff** for background jobs
-- Gracefully handles temporary Cloudinary outages
+- Configured **exponential backoff retry policies** for background jobs  
+- Gracefully handles:
+  - Temporary Cloudinary outages  
+  - Network failures  
+  - Worker crashes  
 
 **Observability**
-- Integrated **BullBoard**
-- Real-time visibility into job states:
-  - Waiting
-  - Active
-  - Completed
-  - Failed
+- Integrated **BullBoard** for real-time job monitoring  
+- Visibility into:
+  - Waiting  
+  - Active  
+  - Completed  
+  - Failed jobs with error diagnostics  
 
 ---
 
-### 4. Containerization & Environment Parity
+### 4️⃣ Cloud Deployment & Traffic Management
 
 **Infrastructure**
-- Fully containerized using **Docker**
+- Deployed on **AWS EC2**  
+- Fully containerized using **Docker**  
 - **Docker Compose** orchestrates:
-  - Node.js API
-  - MongoDB
-  - Redis
+  - Node.js API service  
+  - Redis (cache + queue)  
+  - Background worker services  
+
+**Reverse Proxy**
+- Configured **Nginx as a reverse proxy**:
+  - Handles incoming traffic on port 80  
+  - Routes requests to internal services  
+  - Masks internal application ports for improved security  
 
 **Benefits**
-- Identical dev, test, and prod environments
-- Zero “works on my machine” issues
-- One-command startup
+- Environment parity across dev, test, and production  
+- High availability and clean service isolation  
+- Zero “works on my machine” issues  
 
 ---
 
 ## 🛠 Tech Stack
 
 | Category | Technology |
-|--------|-----------|
+|-------|-----------|
 | Runtime | Node.js (LTS) |
 | Framework | Express.js |
-| Databases | MongoDB (Primary), Redis (Cache & Queue) |
-| Message Queue | BullMQ |
-| Authentication | JWT (Access + Refresh Tokens) |
-| Media / CDN | Cloudinary |
+| Database | MongoDB |
+| Cache & Queue | Redis |
+| Job Processing | BullMQ |
+| Media Storage | Cloudinary |
+| Reverse Proxy | Nginx |
 | Infrastructure | Docker, Docker Compose |
+| Cloud | AWS EC2 |
 | Monitoring | BullBoard |
+| Authentication | JWT (Access & Refresh Tokens) |
 
 ---
 
