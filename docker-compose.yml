@@ -5,7 +5,8 @@ services:
       - "8000:8000"
     env_file:
       - .env
-
+    volumes:
+      - ./public/temp:/app/public/temp
     depends_on: [mongo, redis]
   
   mongo:

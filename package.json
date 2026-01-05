@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@bull-board/express": "^6.16.2",
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.3",
     "bullmq": "^5.66.4",
     "cloudinary": "^2.5.1",
     "cookie-parser": "^1.4.7",
