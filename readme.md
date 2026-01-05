@@ -1,4 +1,4 @@
-# 🎬 TubeScale  
+# 🎬 TubeScale — Event-Driven Backend (AWS EC2, Docker, Nginx, Redis, BullMQ, MongoDB)
 **Scalable Event-Driven Backend & Cloud Infrastructure**
 
 TubeScale is a **production-grade, event-driven backend system** designed for **high scalability, resilience, and low latency**.  
